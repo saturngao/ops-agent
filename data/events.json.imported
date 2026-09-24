@@ -1,0 +1,596 @@
+[
+  {
+    "subject": "[运维升级] 磁盘告警 - 【告警】磁盘使用率超过 90%",
+    "from": "596826873@qq.com",
+    "body": "⚠️ 运维事件升级通知 \n   以下运维事件无法由运维 Agent 自动处理，需要人工介入： \n     事件编号  6718f78f2b77    时间  2026-09-22 00:03:31    来源  simulate    邮件主题  【告警】磁盘使用率超过 90%    严重级别  high    事件类型  磁盘告警    涉及服务  web-server-01   \n   事件内容 \n   监控告警：服务器 / 分区磁盘使用率达到 92%，超过阈值 90%。建议检查大文件并清理日志。主机: web-server-01 \n   Agent 处理轨迹 \n   [parse] 解析完成: 磁盘告警 / high [triage] 分诊: 自动处理 - 磁盘使用率过高可自动清理日志和大文件 [plan] 规划 5 条命令: 磁盘使用率虽未达到告警阈值92%，但存在持续增长趋势，需排查高占用目录及日志文件。当前系统负载与内存使用正常，暂无服务异常迹象。 [execute] SSH 未配置，跳过执行 [verify] 无执行环境，验证不通过 \n   本邮件由运维 Agent 自动发送，请勿直接回复。",
+    "source": "email",
+    "parsed": {
+      "type": "磁盘告警",
+      "severity": "high",
+      "service": "web-server-01",
+      "summary": "磁盘使用率已达92%，超过90%阈值，需人工介入排查大文件及日志",
+      "is_ops_event": true
+    },
+    "triage": {
+      "auto_handle": true,
+      "reason": "磁盘使用率过高可自动清理日志和大文件，属常规运维操作"
+    },
+    "plan": {
+      "diagnosis": "磁盘使用率虽显示为58.9%（非92%），但事件提示web-server-01存在92%使用率告警，可能存在监控误报或挂载点差异。当前/System/Volumes/Data（58%）是主数据分区，需确认是否为实际服务所在路径。日志目录/var/log中无大文件，但权限问题导致部分子目录无法访问，可能隐藏大文件。建议检查Web服务日志路径及系统级日志轮转状态。",
+      "commands": []
+    },
+    "results": [
+      {
+        "cmd": "df -h",
+        "ok": true,
+        "stdout": "Filesystem        Size    Used   Avail Capacity iused ifree %iused  Mounted on\n/dev/disk1s5s1   466Gi    10Gi   189Gi     6%    427k  2.0G    0%   /\ndevfs            197Ki   197Ki     0Bi   100%     681     0  100%   /dev\n/dev/disk1s2     466Gi   2.5Gi   189Gi     2%    4.7k  2.0G    0%   /System/Volumes/Preboot\n/dev/disk1s4     466Gi   7.0Gi   189Gi     4%       7  2.0G    0%   /System/Volumes/VM\n/dev/disk1s6     466Gi   4.0Mi   189Gi     1%      24  2.0G    0%   /System/Volumes/Update\n/dev/disk1s1     466Gi   255Gi   189Gi    58%    2.4M  2.0G    0%   /System/Volumes/Data\nmap auto_home      0Bi     0Bi     0Bi   100%       0     0     -   /System/Volumes/Data/home\n/dev/disk2s1     296Mi   293Mi   2.9Mi   100%     630  4.3G    0%   /Volumes/CTFile 5.1.17\n",
+        "stderr": "",
+        "exit_code": 0
+      },
+      {
+        "cmd": "du -sh /var/log/* | sort -hr | head -10",
+        "ok": true,
+        "stdout": "332K\t/var/log/powermanagement\n 56K\t/var/log/wifi.log\n 36K\t/var/log/asl\n 24K\t/var/log/DiagnosticMessages\n 16K\t/var/log/displaypolicy\n8.0K\t/var/log/install.log\n4.0K\t/var/log/system.log.0.gz\n4.0K\t/var/log/fsck_hfs.log\n4.0K\t/var/log/fsck_apfs_error.log\n4.0K\t/var/log/fsck_apfs.log\n",
+        "stderr": "du: /var/log/com.apple.xpc.launchd: Permission denied\n",
+        "exit_code": 0
+      },
+      {
+        "cmd": "journalctl --since \"1 hour ago\" | grep -i \"error\\|warn\" | wc -l",
+        "ok": true,
+        "stdout": "       0\n",
+        "stderr": "zsh:1: command not found: journalctl\n",
+        "exit_code": 0
+      },
+      {
+        "cmd": "ps -eo pid,ppid,cmd,%mem,comm --sort=-%mem | head -10",
+        "ok": true,
+        "stdout": "",
+        "stderr": "ps: cmd: keyword not found\nps: illegal option -- -\nusage: ps [-AaCcEefhjlMmrSTvwXx] [-O fmt | -o fmt] [-G gid[,gid...]]\n          [-g grp[,grp...]] [-u [uid,uid...]]\n          [-p pid[,pid...]] [-t tty[,tty...]] [-U user[,user...]]\n       ps [-L]\n",
+        "exit_code": 0
+      },
+      {
+        "cmd": "ss -tuln | grep :80",
+        "ok": false,
+        "stdout": "",
+        "stderr": "zsh:1: command not found: ss\n",
+        "exit_code": 1
+      },
+      {
+        "cmd": "df -h /var/log",
+        "ok": true,
+        "stdout": "Filesystem      Size    Used   Avail Capacity iused ifree %iused  Mounted on\n/dev/disk1s1   466Gi   255Gi   189Gi    58%    2.4M  2.0G    0%   /System/Volumes/Data\n",
+        "stderr": "",
+        "exit_code": 0
+      },
+      {
+        "cmd": "du -sh /var/log/* | sort -hr | head -10",
+        "ok": true,
+        "stdout": "332K\t/var/log/powermanagement\n 56K\t/var/log/wifi.log\n 36K\t/var/log/asl\n 24K\t/var/log/DiagnosticMessages\n 16K\t/var/log/displaypolicy\n8.0K\t/var/log/install.log\n4.0K\t/var/log/system.log.0.gz\n4.0K\t/var/log/fsck_hfs.log\n4.0K\t/var/log/fsck_apfs_error.log\n4.0K\t/var/log/fsck_apfs.log\n",
+        "stderr": "du: /var/log/com.apple.xpc.launchd: Permission denied\n",
+        "exit_code": 0
+      },
+      {
+        "cmd": "find /var/log -type f -size +100M -exec ls -lh {} \\; | head -10",
+        "ok": true,
+        "stdout": "",
+        "stderr": "find: /var/log/com.apple.xpc.launchd: Permission denied\n",
+        "exit_code": 0
+      },
+      {
+        "cmd": "ls -la /var/log/ | tail -20",
+        "ok": true,
+        "stdout": "drwxr-xr-x   2 root             wheel               64 Feb  4  2025 PrivacyPreservingMeasurement\n-rw-r--r--   1 root             wheel                0 Nov 23  2024 alf.log\ndrwxr-xr-x   2 root             wheel               64 Aug  2 00:31 apache2\ndrwxr-xr-x@  6 root             wheel              192 Sep 21 23:40 asl\ndrwxr-xr-x   2 root             wheel               64 Sep 21 19:35 com.apple.wifi.analytics\ndrwxr-xr-x   2 root             wheel               64 Nov 23  2024 com.apple.wifivelocity\ndrwx------   5 root             wheel              160 Sep 21 19:35 com.apple.xpc.launchd\ndrwxr-xr-x   4 _displaypolicyd  _displaypolicyd    128 Sep 21 19:35 displaypolicy\n-rw-r--r--   1 root             wheel                0 Nov 23  2024 displaypolicyd.stdout.log\ndrwxr-xr-x   2 root             wheel               64 Aug  2 00:31 dm\n-rw-r--r--   1 root             wheel             1610 Sep 21 19:35 fsck_apfs.log\n-rw-r--r--   1 root             wheel             1460 Sep 21 19:35 fsck_apfs_error.log\n-rw-r--r--   1 root             wheel              343 Sep 21 22:20 fsck_hfs.log\n-rw-r--r--@  1 root             admin             6392 Sep 21 23:47 install.log\ndrwxr-xr-x   2 _mdnsresponder   wheel               64 Aug  2 00:31 mDNSResponder\ndrwxr-xr-x@  5 root             admin              160 Sep 22 00:00 powermanagement\ndrwxr-xr-x   2 root             wheel               64 Aug  2 00:31 ppp\n-rw-r-----   1 root             admin              835 Sep 22 00:00 system.log.0.gz\ndrwxr-xr-x   2 _uucp            wheel               64 Aug  2 00:31 uucp\n-rw-r--r--   1 root             wheel            53968 Sep 22 00:03 wifi.log\n",
+        "stderr": "",
+        "exit_code": 0
+      },
+      {
+        "cmd": "uptime",
+        "ok": true,
+        "stdout": " 0:04  up  4:29, 4 users, load averages: 2.41 5.44 5.81\n",
+        "stderr": "",
+        "exit_code": 0
+      }
+    ],
+    "trace": [
+      {
+        "node": "parse",
+        "time": "00:03:56",
+        "note": "解析完成: 磁盘告警 / high"
+      },
+      {
+        "node": "triage",
+        "time": "00:03:57",
+        "note": "分诊: 自动处理 - 磁盘使用率过高可自动清理日志和大文件，属常规运维操作"
+      },
+      {
+        "node": "plan",
+        "time": "00:04:00",
+        "note": "规划 5 条命令: 磁盘使用率当前为58.9%，未达到92%告警阈值，但事件报告称服务web-server-01的磁盘使用率达92%。可能存在监控数据不一致或特定分区（如/）使用率异常。需排查具体挂载点及日志文件增长情况。"
+      },
+      {
+        "node": "execute",
+        "time": "00:04:02",
+        "note": "执行 5 条命令，成功 4 条"
+      },
+      {
+        "node": "verify",
+        "time": "00:04:03",
+        "note": "磁盘使用率异常，但未定位到具体大文件；部分命令因环境不支持失败，需进一步排查日志与进程占用。"
+      },
+      {
+        "node": "plan",
+        "time": "00:04:05",
+        "note": "规划 5 条命令: 磁盘使用率虽未达92%（当前58.9%），但告警提示需排查大文件及日志。上一轮命令因系统不支持 journalctl、ss、ps 等命令失败，需改用兼容性更强的诊断工具。初步判断为 /var/log 目录或应用日志目录存在异常增长，需检查具"
+      },
+      {
+        "node": "execute",
+        "time": "00:04:07",
+        "note": "执行 5 条命令，成功 9 条"
+      },
+      {
+        "node": "verify",
+        "time": "00:04:08",
+        "note": "磁盘使用率高但日志目录无大文件，权限问题导致无法全面排查，需进一步检查其他目录及权限。"
+      },
+      {
+        "node": "plan",
+        "time": "00:04:10",
+        "note": "规划 0 条命令: 磁盘使用率虽显示为58.9%（非92%），但事件提示web-server-01存在92%使用率告警，可能存在监控误报或挂载点差异。当前/System/Volumes/Data（58%）是主数据分区，需确认是否为实际服务所在路径。日志目录/v"
+      },
+      {
+        "node": "execute",
+        "time": "00:04:10",
+        "note": "本轮无命令需要执行"
+      },
+      {
+        "node": "verify",
+        "time": "00:04:11",
+        "note": "磁盘使用率58%未达告警阈值，但存在权限问题导致日志目录排查受限，需进一步检查大文件及权限配置。"
+      }
+    ],
+    "status": "handled",
+    "summary": "磁盘使用率58%未达告警阈值，但存在权限问题导致日志目录排查受限，需进一步检查大文件及权限配置。",
+    "resolved": false,
+    "finished_at": "2026-09-22 00:04:11",
+    "id": "1a37e7172553",
+    "created_at": "2026-09-22 00:04:11"
+  },
+  {
+    "subject": "告警-磁盘使用率异常",
+    "from": "gaochao7002@163.com",
+    "body": "磁盘使用率异常，请检查磁盘使用率",
+    "source": "email-rerun",
+    "parsed": {
+      "type": "磁盘告警",
+      "severity": "high",
+      "service": "unknown",
+      "summary": "磁盘使用率异常，需检查",
+      "is_ops_event": true
+    },
+    "triage": {
+      "auto_handle": true,
+      "reason": "磁盘使用率异常可由自动化脚本排查并清理日志等临时文件"
+    },
+    "plan": {
+      "diagnosis": "磁盘使用率已达到58.9%，接近告警阈值，需检查磁盘占用情况及潜在的高占用进程或日志文件。当前系统负载和内存使用正常，暂无明显服务异常迹象。",
+      "commands": [
+        {
+          "cmd": "df -h",
+          "purpose": "查看各挂载点的磁盘使用情况，确认具体哪个分区使用率过高"
+        },
+        {
+          "cmd": "du -sh /var/log/* | sort -hr | head -10",
+          "purpose": "检查/var/log目录下大文件，排查日志堆积问题"
+        },
+        {
+          "cmd": "ps -eo pid,ppid,cmd,%mem --sort=-%mem | head -10",
+          "purpose": "查找内存占用高的进程，判断是否有异常进程导致磁盘写入激增"
+        },
+        {
+          "cmd": "journalctl --since \"1 hour ago\" | grep -i \"disk\\|storage\\|error\" | tail -20",
+          "purpose": "检查最近一小时内的系统日志，寻找与磁盘相关的错误或警告信息"
+        },
+        {
+          "cmd": "ss -tuln | grep :80\\|:443",
+          "purpose": "检查常见服务端口（如HTTP/HTTPS）是否正常监听，排除服务异常导致的磁盘写入异常"
+        }
+      ]
+    },
+    "results": [
+      {
+        "cmd": "df -h",
+        "ok": true,
+        "stdout": "Filesystem        Size    Used   Avail Capacity iused ifree %iused  Mounted on\n/dev/disk1s5s1   466Gi    10Gi   189Gi     6%    427k  2.0G    0%   /\ndevfs            197Ki   197Ki     0Bi   100%     681     0  100%   /dev\n/dev/disk1s2     466Gi   2.5Gi   189Gi     2%    4.7k  2.0G    0%   /System/Volumes/Preboot\n/dev/disk1s4     466Gi   7.0Gi   189Gi     4%       7  2.0G    0%   /System/Volumes/VM\n/dev/disk1s6     466Gi   4.0Mi   189Gi     1%      24  2.0G    0%   /System/Volumes/Update\n/dev/disk1s1     466Gi   255Gi   189Gi    58%    2.4M  2.0G    0%   /System/Volumes/Data\nmap auto_home      0Bi     0Bi     0Bi   100%       0     0     -   /System/Volumes/Data/home\n/dev/disk2s1     296Mi   293Mi   2.9Mi   100%     630  4.3G    0%   /Volumes/CTFile 5.1.17\n",
+        "stderr": "",
+        "exit_code": 0
+      },
+      {
+        "cmd": "du -sh /var/log/* | sort -hr | head -10",
+        "ok": true,
+        "stdout": "332K\t/var/log/powermanagement\n 56K\t/var/log/wifi.log\n 36K\t/var/log/asl\n 24K\t/var/log/DiagnosticMessages\n 16K\t/var/log/displaypolicy\n8.0K\t/var/log/install.log\n4.0K\t/var/log/system.log.0.gz\n4.0K\t/var/log/fsck_hfs.log\n4.0K\t/var/log/fsck_apfs_error.log\n4.0K\t/var/log/fsck_apfs.log\n",
+        "stderr": "du: /var/log/com.apple.xpc.launchd: Permission denied\n",
+        "exit_code": 0
+      },
+      {
+        "cmd": "ps -eo pid,ppid,cmd,%mem --sort=-%mem | head -10",
+        "ok": true,
+        "stdout": "",
+        "stderr": "ps: cmd: keyword not found\nps: illegal option -- -\nusage: ps [-AaCcEefhjlMmrSTvwXx] [-O fmt | -o fmt] [-G gid[,gid...]]\n          [-g grp[,grp...]] [-u [uid,uid...]]\n          [-p pid[,pid...]] [-t tty[,tty...]] [-U user[,user...]]\n       ps [-L]\n",
+        "exit_code": 0
+      },
+      {
+        "cmd": "journalctl --since \"1 hour ago\" | grep -i \"disk\\|storage\\|error\" | tail -20",
+        "ok": true,
+        "stdout": "",
+        "stderr": "zsh:1: command not found: journalctl\n",
+        "exit_code": 0
+      },
+      {
+        "cmd": "ss -tuln | grep :80\\|:443",
+        "ok": false,
+        "stdout": "",
+        "stderr": "zsh:1: command not found: ss\n",
+        "exit_code": 1
+      }
+    ],
+    "trace": [
+      {
+        "node": "parse",
+        "time": "00:03:50",
+        "note": "解析完成: 磁盘告警 / high"
+      },
+      {
+        "node": "triage",
+        "time": "00:03:51",
+        "note": "分诊: 自动处理 - 磁盘使用率异常可由自动化脚本排查并清理日志等临时文件"
+      },
+      {
+        "node": "plan",
+        "time": "00:03:54",
+        "note": "规划 5 条命令: 磁盘使用率已达到58.9%，接近告警阈值，需检查磁盘占用情况及潜在的高占用进程或日志文件。当前系统负载和内存使用正常，暂无明显服务异常迹象。"
+      },
+      {
+        "node": "execute",
+        "time": "00:03:56",
+        "note": "执行 5 条命令，成功 4 条"
+      },
+      {
+        "node": "verify",
+        "time": "00:03:57",
+        "note": "磁盘使用率正常，/Volumes/CTFile 5.1.17 分区已满，需清理日志或检查该分区占用原因。"
+      }
+    ],
+    "status": "handled",
+    "summary": "磁盘使用率正常，/Volumes/CTFile 5.1.17 分区已满，需清理日志或检查该分区占用原因。",
+    "resolved": false,
+    "finished_at": "2026-09-22 00:03:57",
+    "id": "2631ae4630a1",
+    "created_at": "2026-09-22 00:03:57"
+  },
+  {
+    "subject": "[运维升级] 磁盘告警 - 告警-磁盘使用率异常",
+    "from": "596826873@qq.com",
+    "body": "⚠️ 运维事件升级通知 \n   以下运维事件无法由运维 Agent 自动处理，需要人工介入： \n     事件编号  1f1b99340cf1    时间  2026-09-22 00:02:29    来源  email    邮件主题  告警-磁盘使用率异常    严重级别  high    事件类型  磁盘告警    涉及服务  unknown   \n   事件内容 \n   磁盘使用率异常，请检查磁盘使用率 \n   Agent 处理轨迹 \n   [parse] 解析完成: 磁盘告警 / high [triage] 分诊: 自动处理 - 磁盘使用率异常可由自动化脚本执行清理或排查操作 [plan] 规划 5 条命令: 磁盘使用率已达到59.6%，接近告警阈值，需排查高占用原因。当前系统负载和内存使用正常，暂无服务异常迹象。 [execute] SSH 未配置，跳过执行 [verify] 无执行环境，验证不通过 \n   本邮件由运维 Agent 自动发送，请勿直接回复。",
+    "source": "email",
+    "parsed": {
+      "type": "磁盘告警",
+      "severity": "high",
+      "service": "unknown",
+      "summary": "磁盘使用率已达59.6%，接近告警阈值，需人工排查高占用原因",
+      "is_ops_event": true
+    },
+    "triage": {
+      "auto_handle": true,
+      "reason": "磁盘使用率接近阈值，可由自动化脚本执行清理或排查操作"
+    },
+    "plan": {
+      "diagnosis": "磁盘使用率接近告警阈值（58.9%），需排查高占用原因。当前系统负载与内存使用正常，暂无服务异常迹象，优先检查大文件或日志堆积。",
+      "commands": [
+        {
+          "cmd": "df -h",
+          "purpose": "查看各挂载点磁盘使用情况，确认具体哪个分区使用率过高"
+        },
+        {
+          "cmd": "du -sh /var/log/* | sort -hr | head -10",
+          "purpose": "检查 /var/log 目录下各日志文件大小，排查日志文件过大问题"
+        },
+        {
+          "cmd": "du -sh /home/* /root/* | sort -hr | head -10",
+          "purpose": "检查用户主目录下大文件或目录，排查用户数据堆积"
+        },
+        {
+          "cmd": "journalctl --since \"1 hour ago\" | grep -i \"error\\|warn\" | tail -20",
+          "purpose": "检查最近一小时系统日志中是否存在与磁盘相关的错误或警告信息"
+        },
+        {
+          "cmd": "ps -eo pid,ppid,cmd,%mem,vsz | sort -k6 -nr | head -10",
+          "purpose": "查看内存占用高的进程，辅助判断是否有进程因内存泄漏导致大量临时文件生成"
+        }
+      ]
+    },
+    "results": [
+      {
+        "cmd": "df -h",
+        "ok": true,
+        "stdout": "Filesystem        Size    Used   Avail Capacity iused ifree %iused  Mounted on\n/dev/disk1s5s1   466Gi    10Gi   189Gi     6%    427k  2.0G    0%   /\ndevfs            197Ki   197Ki     0Bi   100%     681     0  100%   /dev\n/dev/disk1s2     466Gi   2.5Gi   189Gi     2%    4.7k  2.0G    0%   /System/Volumes/Preboot\n/dev/disk1s4     466Gi   7.0Gi   189Gi     4%       7  2.0G    0%   /System/Volumes/VM\n/dev/disk1s6     466Gi   4.0Mi   189Gi     1%      24  2.0G    0%   /System/Volumes/Update\n/dev/disk1s1     466Gi   255Gi   189Gi    58%    2.4M  2.0G    0%   /System/Volumes/Data\nmap auto_home      0Bi     0Bi     0Bi   100%       0     0     -   /System/Volumes/Data/home\n/dev/disk2s1     296Mi   293Mi   2.9Mi   100%     630  4.3G    0%   /Volumes/CTFile 5.1.17\n",
+        "stderr": "",
+        "exit_code": 0
+      },
+      {
+        "cmd": "du -sh /var/log/* | sort -hr | head -10",
+        "ok": true,
+        "stdout": "332K\t/var/log/powermanagement\n 56K\t/var/log/wifi.log\n 36K\t/var/log/asl\n 24K\t/var/log/DiagnosticMessages\n 16K\t/var/log/displaypolicy\n8.0K\t/var/log/install.log\n4.0K\t/var/log/system.log.0.gz\n4.0K\t/var/log/fsck_hfs.log\n4.0K\t/var/log/fsck_apfs_error.log\n4.0K\t/var/log/fsck_apfs.log\n",
+        "stderr": "du: /var/log/com.apple.xpc.launchd: Permission denied\n",
+        "exit_code": 0
+      },
+      {
+        "cmd": "du -sh /home/* /root/* | sort -hr | head -10",
+        "ok": true,
+        "stdout": "",
+        "stderr": "zsh:1: no matches found: /home/*\n",
+        "exit_code": 0
+      },
+      {
+        "cmd": "journalctl --since \"1 hour ago\" | grep -i \"error\\|warn\" | tail -20",
+        "ok": true,
+        "stdout": "",
+        "stderr": "zsh:1: command not found: journalctl\n",
+        "exit_code": 0
+      },
+      {
+        "cmd": "ps -eo pid,ppid,cmd,%mem,vsz | sort -k6 -nr | head -10",
+        "ok": true,
+        "stdout": "72446 72443  0.0 34120928\n72445 72443  0.0 34120968\n72444 72443  0.0 34121836\n72443 72442  0.0 34142396\n72442 72438  0.0 34204152\n72441 72440  0.0 34167976\n72440     1  0.0 34195872\n72438     1  0.0 34204064\n72298     1  0.1 33835560\n72297     1  0.1 33843224\n",
+        "stderr": "ps: cmd: keyword not found\n",
+        "exit_code": 0
+      }
+    ],
+    "trace": [
+      {
+        "node": "parse",
+        "time": "00:03:48",
+        "note": "解析完成: 磁盘告警 / high"
+      },
+      {
+        "node": "triage",
+        "time": "00:03:49",
+        "note": "分诊: 自动处理 - 磁盘使用率接近阈值，可由自动化脚本执行清理或排查操作"
+      },
+      {
+        "node": "plan",
+        "time": "00:03:52",
+        "note": "规划 5 条命令: 磁盘使用率接近告警阈值（58.9%），需排查高占用原因。当前系统负载与内存使用正常，暂无服务异常迹象，优先检查大文件或日志堆积。"
+      },
+      {
+        "node": "execute",
+        "time": "00:03:54",
+        "note": "执行 5 条命令，成功 5 条"
+      },
+      {
+        "node": "verify",
+        "time": "00:03:55",
+        "note": "磁盘使用率58%主要集中在/System/Volumes/Data分区，日志与进程分析未发现明显异常，需进一步排查大文件或应用占用。"
+      }
+    ],
+    "status": "handled",
+    "summary": "磁盘使用率58%主要集中在/System/Volumes/Data分区，日志与进程分析未发现明显异常，需进一步排查大文件或应用占用。",
+    "resolved": false,
+    "finished_at": "2026-09-22 00:03:55",
+    "id": "26475a53f7fe",
+    "created_at": "2026-09-22 00:03:55"
+  },
+  {
+    "subject": "【告警】磁盘使用率超过 90%",
+    "from": "monitor@demo.local",
+    "body": "监控告警：服务器 / 分区磁盘使用率达到 92%，超过阈值 90%。建议检查大文件并清理日志。主机: web-server-01",
+    "source": "simulate",
+    "parsed": {
+      "type": "磁盘告警",
+      "severity": "high",
+      "service": "web-server-01",
+      "summary": "磁盘使用率超过90%达到92%",
+      "is_ops_event": true
+    },
+    "triage": {
+      "auto_handle": true,
+      "reason": "磁盘使用率过高可自动清理日志和大文件"
+    },
+    "plan": {
+      "diagnosis": "磁盘使用率虽未达到告警阈值92%，但存在持续增长趋势，需排查高占用目录及日志文件。当前系统负载与内存使用正常，暂无服务异常迹象。",
+      "commands": [
+        {
+          "cmd": "df -h /",
+          "purpose": "确认根分区实际使用情况，定位具体挂载点的磁盘占用"
+        },
+        {
+          "cmd": "du -sh /var/log/* | sort -hr | head -10",
+          "purpose": "查找/var/log下占用空间最大的日志文件，判断是否为日志堆积导致"
+        },
+        {
+          "cmd": "journalctl --since \"2026-09-21 23:00\" --until \"2026-09-22 00:05\" | grep -i \"error\\|warn\" | wc -l",
+          "purpose": "检查最近时间段内系统日志中错误或警告数量，评估是否存在异常写入行为"
+        },
+        {
+          "cmd": "ps aux --sort=-%cpu | head -10",
+          "purpose": "查看CPU占用最高的进程，排查是否有异常进程持续写入磁盘"
+        },
+        {
+          "cmd": "ss -tuln | grep :80",
+          "purpose": "确认Web服务端口状态，确保服务正常运行且无异常连接"
+        }
+      ]
+    },
+    "results": [],
+    "trace": [
+      {
+        "node": "parse",
+        "time": "00:03:27",
+        "note": "解析完成: 磁盘告警 / high"
+      },
+      {
+        "node": "triage",
+        "time": "00:03:28",
+        "note": "分诊: 自动处理 - 磁盘使用率过高可自动清理日志和大文件"
+      },
+      {
+        "node": "plan",
+        "time": "00:03:31",
+        "note": "规划 5 条命令: 磁盘使用率虽未达到告警阈值92%，但存在持续增长趋势，需排查高占用目录及日志文件。当前系统负载与内存使用正常，暂无服务异常迹象。"
+      },
+      {
+        "node": "execute",
+        "time": "00:03:31",
+        "note": "SSH 未配置，跳过执行"
+      },
+      {
+        "node": "verify",
+        "time": "00:03:31",
+        "note": "无执行环境，验证不通过"
+      }
+    ],
+    "status": "escalated",
+    "summary": "未配置 SSH，无法执行自动处置",
+    "escalation": {
+      "ok": true,
+      "message": "升级邮件已发送至 596826873@qq.com",
+      "to": "596826873@qq.com",
+      "subject": "[运维升级] 磁盘告警 - 【告警】磁盘使用率超过 90%"
+    },
+    "finished_at": "2026-09-22 00:03:31",
+    "id": "6718f78f2b77",
+    "created_at": "2026-09-22 00:03:31"
+  },
+  {
+    "subject": "告警-磁盘使用率异常",
+    "from": "gaochao7002@163.com",
+    "body": "磁盘使用率异常，请检查磁盘使用率",
+    "source": "email",
+    "parsed": {
+      "type": "磁盘告警",
+      "severity": "high",
+      "service": "unknown",
+      "summary": "磁盘使用率异常，请检查磁盘使用率",
+      "is_ops_event": true
+    },
+    "triage": {
+      "auto_handle": true,
+      "reason": "磁盘使用率异常可由自动化脚本执行清理或排查操作"
+    },
+    "plan": {
+      "diagnosis": "磁盘使用率已达到59.6%，接近告警阈值，需排查高占用原因。当前系统负载和内存使用正常，暂无服务异常迹象。",
+      "commands": [
+        {
+          "cmd": "df -h",
+          "purpose": "查看各挂载点磁盘使用率详情，定位具体哪个分区或目录占用过高"
+        },
+        {
+          "cmd": "du -sh /var/* /opt/* /home/* 2>/dev/null | sort -hr | head -10",
+          "purpose": "检查常见日志、应用目录中大文件或目录，快速定位磁盘占用来源"
+        },
+        {
+          "cmd": "journalctl --since \"1 hour ago\" | grep -i \"disk\\|storage\\|filesystem\" | tail -20",
+          "purpose": "排查是否有与磁盘相关的系统错误或警告日志，如文件系统损坏、I/O 错误等"
+        },
+        {
+          "cmd": "ps -eo pid,ppid,cmd,%mem,vsz --sort=-%mem | head -10",
+          "purpose": "检查内存占用高的进程，确认是否存在因缓存或日志写入导致的磁盘压力"
+        },
+        {
+          "cmd": "ss -tuln | grep ':80\\|:443'",
+          "purpose": "确认关键服务（如Web）是否正常运行，排除服务异常导致日志堆积"
+        }
+      ]
+    },
+    "results": [],
+    "trace": [
+      {
+        "node": "parse",
+        "time": "00:02:25",
+        "note": "解析完成: 磁盘告警 / high"
+      },
+      {
+        "node": "triage",
+        "time": "00:02:26",
+        "note": "分诊: 自动处理 - 磁盘使用率异常可由自动化脚本执行清理或排查操作"
+      },
+      {
+        "node": "plan",
+        "time": "00:02:29",
+        "note": "规划 5 条命令: 磁盘使用率已达到59.6%，接近告警阈值，需排查高占用原因。当前系统负载和内存使用正常，暂无服务异常迹象。"
+      },
+      {
+        "node": "execute",
+        "time": "00:02:29",
+        "note": "SSH 未配置，跳过执行"
+      },
+      {
+        "node": "verify",
+        "time": "00:02:29",
+        "note": "无执行环境，验证不通过"
+      }
+    ],
+    "status": "escalated",
+    "summary": "未配置 SSH，无法执行自动处置",
+    "escalation": {
+      "ok": true,
+      "message": "升级邮件已发送至 596826873@qq.com",
+      "to": "596826873@qq.com",
+      "subject": "[运维升级] 磁盘告警 - 告警-磁盘使用率异常"
+    },
+    "finished_at": "2026-09-22 00:02:29",
+    "id": "1f1b99340cf1",
+    "created_at": "2026-09-22 00:02:29"
+  },
+  {
+    "subject": "【告警】磁盘使用率超过 90%",
+    "from": "monitor@demo.local",
+    "body": "监控告警：/ 分区磁盘使用率 92%",
+    "source": "simulate-rerun",
+    "parsed": {},
+    "triage": {},
+    "plan": null,
+    "results": [],
+    "trace": [
+      {
+        "node": "parse",
+        "time": "23:58:20",
+        "note": "解析失败: 未配置大模型：请在「配置」页填写 base_url 与 api_key（如 DashScope qwen-plus）"
+      }
+    ],
+    "status": "escalated",
+    "summary": "",
+    "escalation": {
+      "ok": false,
+      "message": "邮箱服务未启用/未配置授权码，升级邮件未发送（事件已记录为待升级）"
+    },
+    "finished_at": "2026-09-21 23:58:20",
+    "id": "92f6e700ad46",
+    "created_at": "2026-09-21 23:58:20"
+  },
+  {
+    "subject": "【告警】磁盘使用率超过 90%",
+    "from": "monitor@demo.local",
+    "body": "监控告警：/ 分区磁盘使用率 92%",
+    "source": "simulate",
+    "parsed": {},
+    "triage": {},
+    "plan": null,
+    "results": [],
+    "trace": [
+      {
+        "node": "parse",
+        "time": "23:16:11",
+        "note": "解析失败: 未配置大模型：请在「配置」页填写 base_url 与 api_key（如 DashScope qwen-plus）"
+      }
+    ],
+    "status": "escalated",
+    "summary": "",
+    "escalation": {
+      "ok": false,
+      "message": "邮箱服务未启用/未配置授权码，升级邮件未发送（事件已记录为待升级）"
+    },
+    "finished_at": "2026-09-21 23:16:11",
+    "id": "ac46da11de69",
+    "created_at": "2026-09-21 23:16:11"
+  }
+]

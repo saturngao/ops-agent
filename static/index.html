@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>运维 Agent</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<style>
+:root{
+  --bg:#f5f7fa;--card:#ffffff;--border:#e5e9f0;--text:#1f2937;--muted:#6b7280;
+  --primary:#2563eb;--primary-soft:#eff6ff;--red:#dc2626;--green:#16a34a;--orange:#d97706;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);font-size:14px}
+.header{background:linear-gradient(135deg,#1e3a8a,#2563eb);color:#fff;padding:18px 28px;display:flex;align-items:center;gap:14px}
+.header h1{font-size:20px;font-weight:600}
+.header .sub{opacity:.85;font-size:13px}
+.badge{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.15);padding:4px 12px;border-radius:20px;font-size:12px}
+.dot{width:8px;height:8px;border-radius:50%;background:#4ade80}
+.dot.off{background:#f87171}
+.tabs{display:flex;gap:4px;background:var(--card);border-bottom:1px solid var(--border);padding:0 24px;position:sticky;top:0;z-index:10}
+.tab{padding:13px 20px;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;font-weight:500}
+.tab.active{color:var(--primary);border-bottom-color:var(--primary)}
+.main{padding:20px 24px;max-width:1280px;margin:0 auto}
+.grid{display:grid;gap:16px}
+.grid.stats{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px}
+.stat .label{color:var(--muted);font-size:13px}
+.stat .value{font-size:26px;font-weight:700;margin-top:6px}
+.stat .value.blue{color:var(--primary)}.stat .value.green{color:var(--green)}
+.stat .value.red{color:var(--red)}.stat .value.orange{color:var(--orange)}
+.chart{width:100%;height:300px}
+h2{font-size:16px;margin-bottom:12px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{ text-align:left;color:var(--muted);font-weight:500;padding:8px 10px;border-bottom:1px solid var(--border)}
+td{padding:10px;border-bottom:1px solid #f0f2f5;vertical-align:top}
+.tag{display:inline-block;padding:2px 10px;border-radius:12px;font-size:12px}
+.tag.handled{background:#dcfce7;color:#15803d}
+.tag.escalated{background:#fee2e2;color:#b91c1c}
+.tag.ignored{background:#f3f4f6;color:#6b7280}
+.tag.critical{background:#fee2e2;color:#b91c1c}
+.tag.high{background:#ffedd5;color:#c2410c}
+.tag.medium{background:#fef9c3;color:#a16207}
+.tag.low{background:#dbeafe;color:#1d4ed8}
+.btn{background:var(--primary);color:#fff;border:none;padding:9px 18px;border-radius:8px;cursor:pointer;font-size:13px}
+.btn:hover{opacity:.9}
+.btn.ghost{background:var(--primary-soft);color:var(--primary)}
+.btn.small{padding:4px 10px;font-size:12px}
+.chat-box{display:flex;flex-direction:column;gap:12px}
+.msg{padding:12px 16px;border-radius:10px;max-width:92%;line-height:1.7;white-space:pre-wrap}
+.msg.user{align-self:flex-end;background:var(--primary);color:#fff}
+.msg.bot{align-self:flex-start;background:#f3f6fb;border:1px solid var(--border)}
+.input-row{display:flex;gap:10px}
+.input-row input,.input-row select{flex:1;padding:11px 14px;border:1px solid var(--border);border-radius:8px;font-size:14px;outline:none}
+.input-row input:focus{border-color:var(--primary)}
+.form-grid{display:grid;grid-template-columns:160px 1fr;gap:12px 16px;align-items:center}
+.form-grid label{color:var(--muted);font-size:13px;text-align:right}
+.form-grid input{padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;width:100%}
+.form-grid .full{grid-column:1/-1}
+.section{margin-bottom:14px}
+.section h3{font-size:14px;color:var(--primary);margin-bottom:10px;border-left:3px solid var(--primary);padding-left:8px}
+.muted{color:var(--muted);font-size:12px}
+.trace{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.8}
+.hidden{display:none}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1f2937;color:#fff;padding:10px 22px;border-radius:8px;font-size:13px;opacity:0;transition:.3s;z-index:99}
+.toast.show{opacity:.95}
+.empty{text-align:center;color:var(--muted);padding:40px 0}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>🤖 运维 Agent</h1>
+  <div class="sub">邮件接收 · 大模型分析 · SSH 自动处置 · 事件记录与升级</div>
+  <div style="flex:1"></div>
+  <div class="badge"><span class="dot" id="dot-status"></span><span id="status-text">加载中…</span></div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" data-tab="dashboard">📊 仪表盘</div>
+  <div class="tab" data-tab="events">📋 事件记录</div>
+  <div class="tab" data-tab="analysis">💬 智能分析</div>
+  <div class="tab" data-tab="logs">📜 调用日志</div>
+  <div class="tab" data-tab="settings">⚙️ 配置</div>
+</div>
+
+<div class="main">
+  <!-- 仪表盘 -->
+  <div id="tab-dashboard">
+    <div class="grid stats" style="margin-bottom:16px">
+      <div class="card stat"><div class="label">事件总数</div><div class="value blue" id="st-total">-</div></div>
+      <div class="card stat"><div class="label">已自动处理</div><div class="value green" id="st-handled">-</div></div>
+      <div class="card stat"><div class="label">已升级人工</div><div class="value red" id="st-escalated">-</div></div>
+      <div class="card stat"><div class="label">已忽略（非运维）</div><div class="value" id="st-ignored" style="color:#6b7280">-</div></div>
+    </div>
+    <div class="card" style="margin-bottom:16px">
+      <h2>服务器指标（近 24 小时）</h2>
+      <div id="chart" class="chart"></div>
+      <div class="muted" id="collector-info"></div>
+    </div>
+    <div class="card">
+      <h2>最近事件</h2>
+      <div id="dash-events"></div>
+    </div>
+  </div>
+
+  <!-- 事件记录 -->
+  <div id="tab-events" class="hidden">
+    <div class="card" style="margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <h2 style="margin:0;flex:1">事件列表</h2>
+        <button class="btn ghost small" onclick="checkEmail()">📥 立即检查邮件</button>
+        <button class="btn small" onclick="simulateDialog()">🧪 注入模拟告警邮件</button>
+      </div>
+    </div>
+    <div class="card"><div id="events-table"></div></div>
+  </div>
+
+  <!-- 智能分析 -->
+  <div id="tab-analysis" class="hidden">
+    <div class="card">
+      <h2>自然语言数据分析</h2>
+      <div class="muted" style="margin-bottom:12px">支持数据查询、趋势分析、异常识别、指标对比。示例：最近24小时CPU有什么异常？/ 磁盘使用率趋势如何？/ 对比今天和昨天的内存占用</div>
+      <div class="chat-box" id="chat-box" style="margin-bottom:14px;min-height:200px;max-height:480px;overflow-y:auto">
+        <div class="msg bot">你好！我是运维数据分析助手。基于本地存储的服务器指标和运维事件，可以回答你的运维数据问题。请先确保已在「配置」页填写大模型 API。</div>
+      </div>
+      <div class="input-row">
+        <input id="q-input" placeholder="例如：最近24小时 CPU 使用率有什么异常？" onkeydown="if(event.key==='Enter')ask()">
+        <select id="q-hours" style="flex:0 0 130px">
+          <option value="6">近 6 小时</option>
+          <option value="24" selected>近 24 小时</option>
+          <option value="72">近 3 天</option>
+          <option value="168">近 7 天</option>
+        </select>
+        <button class="btn" onclick="ask()">发送</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 调用日志 -->
+  <div id="tab-logs" class="hidden">
+    <div class="card">
+      <h2>大模型调用日志</h2>
+      <div class="muted" style="margin-bottom:10px">所有 LLM 调用（Agent 各节点与数据分析）均记录到 MySQL，含耗时与错误信息。</div>
+      <div id="llm-logs"></div>
+    </div>
+  </div>
+
+  <!-- 配置 -->
+  <div id="tab-settings" class="hidden">
+    <div class="card" style="margin-bottom:16px">
+      <div class="section"><h3>🗄️ MySQL 数据库（本地引导配置）</h3>
+        <div class="form-grid">
+          <label>主机</label><input id="c-db-host" placeholder="127.0.0.1">
+          <label>端口</label><input id="c-db-port" type="number" value="3306">
+          <label>用户名</label><input id="c-db-user" value="root">
+          <label>密码</label><input id="c-db-pass" type="password">
+          <label>数据库名</label><input id="c-db-name" value="ops_agent">
+        </div>
+        <div style="margin-top:10px"><button class="btn ghost small" onclick="testDb()">测试数据库连接</button> <span class="muted" id="db-test-result"></span></div>
+        <div class="muted" style="margin-top:8px">连接信息保存在本地 data/config.json（引导配置）；事件、指标、配置、LLM 调用日志全部存入 MySQL，库表首次启动时自动创建。</div>
+      </div>
+      <div class="section"><h3>🧠 大模型（OpenAI 兼容接口）</h3>
+        <div class="form-grid">
+          <label>Base URL</label><input id="c-llm-url" placeholder="https://dashscope.aliyuncs.com/compatible-mode/v1">
+          <label>API Key</label><input id="c-llm-key" type="password" placeholder="sk-...">
+          <label>模型</label><input id="c-llm-model" placeholder="qwen-plus / deepseek-chat / gpt-4o-mini">
+        </div>
+        <div class="muted" style="margin-top:8px">DashScope（通义千问）示例模型：qwen-plus、qwen-max。Key 仅保存在本地 data/config.json。</div>
+      </div>
+      <div class="section"><h3>📧 邮件 MCP 服务（接收通知邮件 / 发送升级邮件）</h3>
+        <div class="form-grid">
+          <label>启用邮件服务</label><input id="c-email-enabled" type="checkbox" style="width:auto">
+          <label>邮箱账号</label><input id="c-email-user" placeholder="your@qq.com">
+          <label>授权码</label><input id="c-email-auth" type="password" placeholder="QQ邮箱 IMAP/SMTP 授权码">
+          <label>IMAP 服务器</label><input id="c-email-imap" placeholder="imap.qq.com">
+          <label>SMTP 服务器</label><input id="c-email-smtp" placeholder="smtp.qq.com">
+          <label>轮询间隔(秒)</label><input id="c-email-interval" type="number">
+          <label>升级收件邮箱</label><input id="c-email-escalate" placeholder="596826873@qq.com">
+          <label>主题关键词</label><input id="c-email-kw" placeholder="逗号分隔，如：告警,监控,alert">
+        </div>
+        <div class="muted" style="margin-top:8px">Agent 收到运维通知邮件后自动处理；无法处理的事件将自动发送升级邮件到上方收件邮箱。QQ邮箱需在设置中开启 IMAP/SMTP 并使用授权码。</div>
+      </div>
+      <div class="section"><h3>🖥️ SSH 服务器</h3>
+        <div class="form-grid">
+          <label>启用 SSH</label><input id="c-ssh-enabled" type="checkbox" style="width:auto">
+          <label>主机</label><input id="c-ssh-host" placeholder="服务器 IP">
+          <label>端口</label><input id="c-ssh-port" type="number" value="22">
+          <label>用户名</label><input id="c-ssh-user" value="root">
+          <label>密码</label><input id="c-ssh-pass" type="password">
+          <label>私钥路径</label><input id="c-ssh-key" placeholder="~/.ssh/id_rsa（可选）">
+          <label>允许重启服务</label><input id="c-ssh-restart" type="checkbox" style="width:auto">
+        </div>
+        <div style="margin-top:10px"><button class="btn ghost small" onclick="testSsh()">测试 SSH 连接</button> <span class="muted" id="ssh-test-result"></span></div>
+      </div>
+      <div class="section"><h3>📈 指标采集</h3>
+        <div class="form-grid">
+          <label>启用采集</label><input id="c-col-enabled" type="checkbox" style="width:auto">
+          <label>采集间隔(秒)</label><input id="c-col-interval" type="number">
+          <label>演示模式</label><input id="c-col-demo" type="checkbox" style="width:auto">
+        </div>
+        <div class="muted" style="margin-top:8px">SSH 可用时采集真实指标；未配置 SSH 时开启演示模式将生成模拟数据供体验分析功能。</div>
+      </div>
+      <button class="btn" onclick="saveSettings()">保存配置</button>
+      <span class="muted" id="save-result" style="margin-left:12px"></span>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $=s=>document.querySelector(s);
+function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),2600)}
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('[id^=tab-]').forEach(x=>x.classList.add('hidden'));
+  t.classList.add('active');$('#tab-'+t.dataset.tab).classList.remove('hidden');
+  if(t.dataset.tab==='dashboard')refreshDashboard();
+  if(t.dataset.tab==='events')refreshEvents();
+  if(t.dataset.tab==='logs')loadLogs();
+  if(t.dataset.tab==='settings')loadSettings();
+});
+
+function esc(s){return (s??'').toString().replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}
+
+async function refreshDashboard(){
+  const st=await (await fetch('/api/status')).json();
+  $('#st-total').textContent=st.counts.total;
+  $('#st-handled').textContent=st.counts.handled;
+  $('#st-escalated').textContent=st.counts.escalated;
+  $('#st-ignored').textContent=st.counts.ignored;
+  const llmOk=st.llm.configured, sshOk=st.ssh.connected, mailOk=st.email.enabled&&st.email.configured;
+  $('#dot-status').className='dot'+((llmOk&&(sshOk||mailOk))?'':' off');
+  $('#status-text').textContent=`模型${llmOk?'✓':'未配置'} · SSH${sshOk?'✓':'未连接'} · 邮件${mailOk?'✓':'未启用'}`;
+  $('#collector-info').textContent=st.runtime.collector&&st.runtime.collector.ts?
+    `最近采集: ${st.runtime.collector.ts}（来源: ${st.runtime.collector.source==='demo'?'演示模拟':'SSH'}）`:'暂无采集数据';
+  // 图表
+  const data=await (await fetch('/api/metrics?hours=24')).json();
+  const r=data.records||[];
+  const T=r.map(x=>new Date(x.ts*1000).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'}));
+  const mk=(k)=>({type:'line',smooth:true,showSymbol:false,data:r.map(x=>x[k]),name:
+    {cpu_pct:'CPU %',mem_used_pct:'内存 %',disk_used_pct:'磁盘 %',load1:'负载'}[k]});
+  const chart=echarts.init($('#chart'));
+  chart.setOption({tooltip:{trigger:'axis'},legend:{top:0},
+    grid:{left:40,right:20,top:34,bottom:28},
+    xAxis:{type:'category',data:T},yAxis:{type:'value',max:v=>Math.ceil(v.max*1.1)},
+    series:[mk('cpu_pct'),mk('mem_used_pct'),mk('disk_used_pct'),mk('load1')]});
+  // 最近事件
+  const evs=(await (await fetch('/api/events?limit=8')).json());
+  $('#dash-events').innerHTML=evs.length?evs.map(e=>`
+    <div style="padding:10px 0;border-bottom:1px solid #f0f2f5">
+      <span class="tag ${e.status||'ignored'}">${{handled:'✅已处理',escalated:'🔺已升级',ignored:'忽略'}[e.status]||e.status}</span>
+      <b style="margin-left:8px">${esc(e.subject)}</b>
+      <div class="muted">${esc(e.created_at)} · 来源:${esc(e.source)} · ${(e.parsed||{}).type||''} ${e.summary?'· '+esc(e.summary):''}</div>
+    </div>`).join(''):'<div class="empty">暂无事件。可在「事件记录」页注入模拟告警邮件体验完整流程。</div>';
+}
+
+async function refreshEvents(){
+  const evs=await (await fetch('/api/events?limit=100')).json();
+  $('#events-table').innerHTML=evs.length?`<table><tr><th>时间</th><th>事件</th><th>级别</th><th>状态</th><th>结论</th><th>操作</th></tr>`+
+    evs.map(e=>{
+      const sev=(e.parsed||{}).severity||'-';
+      return `<tr>
+      <td style="white-space:nowrap">${esc(e.created_at)}</td>
+      <td><b>${esc(e.subject)}</b><div class="muted">${esc(e.source)} · ${(e.parsed||{}).type||''}</div>
+        ${(e.trace||[]).length?`<div class="trace">${e.trace.map(t=>'▸ '+esc(t.note)).join('<br>')}</div>`:''}</td>
+      <td>${sev!=='-'?`<span class="tag ${sev}">${sev}</span>`:'-'}</td>
+      <td><span class="tag ${e.status||'ignored'}">${{handled:'已处理',escalated:'已升级',ignored:'忽略'}[e.status]||e.status||'-'}</span>
+        ${e.escalation&&e.escalation.ok?'<div class="muted">📧 升级邮件已发送</div>':''}</td>
+      <td style="max-width:280px">${esc(e.summary||e.error||'')}</td>
+      <td><button class="btn ghost small" onclick="rerun('${e.id}')">重新处理</button></td></tr>`;
+    }).join('')+'</table>':'<div class="empty">暂无事件</div>';
+}
+
+async function rerun(id){await fetch(`/api/events/${id}/rerun`,{method:'POST'});toast('已重新提交处理');setTimeout(refreshEvents,2500)}
+
+function simulateDialog(){
+  const subject=prompt('模拟告警邮件主题：','【告警】磁盘使用率超过 90%');if(subject===null)return;
+  const body=prompt('邮件正文：','监控告警：服务器 / 分区磁盘使用率达到 92%，超过阈值 90%。建议检查大文件并清理日志。主机: web-server-01');
+  fetch('/api/events/simulate',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({subject,body})}).then(()=>{toast('已注入模拟邮件，Agent 处理中（约需 10-30 秒）');setTimeout(refreshEvents,4000)});
+}
+async function checkEmail(){const r=await (await fetch('/api/email/check',{method:'POST'})).json();
+  toast(`检查完成，收到 ${r.received} 封运维邮件`);setTimeout(refreshEvents,2000)}
+
+async function ask(){
+  const q=$('#q-input').value.trim();if(!q)return;
+  $('#q-input').value='';
+  const box=$('#chat-box');
+  box.insertAdjacentHTML('beforeend',`<div class="msg user">${esc(q)}</div><div class="msg bot" id="loading">分析中，请稍候…（读取本地指标 + 调用大模型）</div>`);
+  box.scrollTop=box.scrollHeight;
+  const hours=parseFloat($('#q-hours').value);
+  const r=await (await fetch('/api/analysis',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({question:q,hours})})).json();
+  $('#loading').remove();
+  const html=r.ok?r.answer.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/\n/g,'<br>')
+    :`<span style="color:var(--red)">${esc(r.answer)}</span>`;
+  box.insertAdjacentHTML('beforeend',`<div class="msg bot">${html}</div>`);
+  box.scrollTop=box.scrollHeight;
+}
+
+async function loadSettings(){
+  const c=(await (await fetch('/api/config')).json());
+  $('#c-db-host').value=c.mysql.host;$('#c-db-port').value=c.mysql.port;$('#c-db-user').value=c.mysql.user;
+  $('#c-db-pass').value=c.mysql.password;$('#c-db-name').value=c.mysql.database;
+  $('#c-llm-url').value=c.llm.base_url;$('#c-llm-key').value=c.llm.api_key;$('#c-llm-model').value=c.llm.model;
+  $('#c-email-enabled').checked=c.email.enabled;$('#c-email-user').value=c.email.username;
+  $('#c-email-auth').value=c.email.auth_code;$('#c-email-imap').value=c.email.imap_host;
+  $('#c-email-smtp').value=c.email.smtp_host;$('#c-email-interval').value=c.email.poll_interval;
+  $('#c-email-escalate').value=c.email.escalate_to;$('#c-email-kw').value=(c.email.subject_keywords||[]).join(',');
+  $('#c-ssh-enabled').checked=c.ssh.enabled;$('#c-ssh-host').value=c.ssh.host;$('#c-ssh-port').value=c.ssh.port;
+  $('#c-ssh-user').value=c.ssh.username;$('#c-ssh-pass').value=c.ssh.password;$('#c-ssh-key').value=c.ssh.key_path;
+  $('#c-ssh-restart').checked=c.ssh.allow_restart;
+  $('#c-col-enabled').checked=c.collector.enabled;$('#c-col-interval').value=c.collector.interval;$('#c-col-demo').checked=c.collector.demo_mode;
+}
+async function saveSettings(){
+  const body={config:{
+    mysql:{host:$('#c-db-host').value,port:+$('#c-db-port').value||3306,user:$('#c-db-user').value,
+      password:$('#c-db-pass').value,database:$('#c-db-name').value},
+    llm:{base_url:$('#c-llm-url').value,api_key:$('#c-llm-key').value,model:$('#c-llm-model').value},
+    email:{enabled:$('#c-email-enabled').checked,username:$('#c-email-user').value,auth_code:$('#c-email-auth').value,
+      imap_host:$('#c-email-imap').value,smtp_host:$('#c-email-smtp').value,poll_interval:+$('#c-email-interval').value||60,
+      escalate_to:$('#c-email-escalate').value,subject_keywords:$('#c-email-kw').value.split(/[,，]/).map(s=>s.trim()).filter(Boolean)},
+    ssh:{enabled:$('#c-ssh-enabled').checked,host:$('#c-ssh-host').value,port:+$('#c-ssh-port').value||22,
+      username:$('#c-ssh-user').value,password:$('#c-ssh-pass').value,key_path:$('#c-ssh-key').value,allow_restart:$('#c-ssh-restart').checked},
+    collector:{enabled:$('#c-col-enabled').checked,interval:+$('#c-col-interval').value||300,demo_mode:$('#c-col-demo').checked}
+  }};
+  const r=await (await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();
+  $('#save-result').textContent='✓ 已保存（轮询与采集将按新配置生效）';
+  setTimeout(()=>$('#save-result').textContent='',4000);
+}
+async function testSsh(){
+  $('#ssh-test-result').textContent='测试中…';
+  const r=await (await fetch('/api/ssh/test',{method:'POST'})).json();
+  $('#ssh-test-result').textContent=(r.ok?'✓ ':'✗ ')+r.message;
+}
+async function testDb(){
+  $('#db-test-result').textContent='测试中…';
+  const r=await (await fetch('/api/db/test',{method:'POST'})).json();
+  $('#db-test-result').textContent=(r.ok?'✓ ':'✗ ')+r.message;
+}
+async function loadLogs(){
+  const logs=await (await fetch('/api/llm-logs?limit=100')).json();
+  $('#llm-logs').innerHTML=logs.length?`<table><tr><th>时间</th><th>调用来源</th><th>模型</th><th>结果</th><th>耗时</th><th>输入字符</th><th>错误</th></tr>`+
+    logs.map(l=>`<tr><td style="white-space:nowrap">${esc(l.ts)}</td><td>${esc(l.node)}</td><td>${esc(l.model)}</td>
+      <td>${l.ok?'<span class="tag handled">成功</span>':'<span class="tag escalated">失败</span>'}</td>
+      <td>${l.latency_ms} ms</td><td>${l.prompt_chars}</td>
+      <td style="max-width:260px;color:var(--red)">${esc(l.error||'')}</td></tr>`).join('')+'</table>'
+    :'<div class="empty">暂无调用记录</div>';
+}
+
+refreshDashboard();setInterval(()=>{if(!$('#tab-dashboard').classList.contains('hidden'))refreshDashboard()},30000);
+</script>
+</body>
+</html>

@@ -1,0 +1,43 @@
+{
+  "llm": {
+    "base_url": "https://api.agicto.cn/v1",
+    "api_key": "",
+    "model": "qwen-flash",
+    "temperature": 0.2
+  },
+  "email": {
+    "enabled": true,
+    "imap_host": "imap.qq.com",
+    "imap_port": 993,
+    "smtp_host": "smtp.qq.com",
+    "smtp_port": 465,
+    "username": "596826873@qq.com",
+    "auth_code": "",
+    "poll_interval": 60,
+    "escalate_to": "596826873@qq.com",
+    "subject_keywords": [
+      "告警",
+      "监控",
+      "运维",
+      "alert",
+      "ops",
+      "alarm"
+    ]
+  },
+  "ssh": {
+    "enabled": true,
+    "host": "127.0.0.1",
+    "port": 22,
+    "username": "mac",
+    "password": "",
+    "key_path": "",
+    "allow_restart": true,
+    "timeout": 30
+  },
+  "collector": {
+    "enabled": true,
+    "interval": 300,
+    "demo_mode": true
+  },
+  "mysql": {}
+}
